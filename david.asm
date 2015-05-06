@@ -10,6 +10,20 @@
 	
 	#data
 	main_memory: .word 0 : 65536 #roughly 65KB of storage in main memory
+	cache: .word 0
+	actual_cache_size: .word 0
+	virtual_cache_size: .word 0
+	line_size: .word 0
+	set_size: .word 0
+	lines_per_set: .word 0
+	num_lines: .word 0
+	num_sets: .word 0
+	offset_size: .word 0
+	set_index_size: .word 0
+	tag_size: .word 0
+	access_queue: .word 0
+	access_queue_size: .word 200
+	
 	
 .text
 
@@ -18,13 +32,16 @@ main:
 	la $t7, ask_for_line_size 
 	jal collectInput
 	move $s1, $a0
+	sw $s1, line_size
 	
 	la $t7, ask_for_lines_per_set
 	jal collectInput
 	move $s2, $a0
+	sw $s2, lines_per_set
 	
 	mult $s1, $s2
 	mflo $s3
+	sw $s3, set_size
 	move $t7, $s3
 	jal printInt #print set size
 	
@@ -34,9 +51,11 @@ main:
 	addi $t9, $zero, 1000
 	mult $s0, $t9
 	mflo $s0
+	sw $s0, virtual_cache_size
 	
 	div $s0, $s1
 	mflo $s4 #number of lines
+	sw $s4, num_lines
 	
 	move $t7, $s4
 	jal printInt #print number of lines
@@ -44,6 +63,7 @@ main:
 	div $s0, $s3
 	mfhi $t1 #cache size not divisible by set size
 	mflo $s5 #number of sets
+	sw $s5, num_sets
 	move $t7, $s5
 	jal printInt #print number of sets
 	
@@ -59,6 +79,7 @@ allocation:
 	mult $t1, $s4 #find amount of extra info to be added for valid bit and tag
 	mflo $t1
 	add $s0, $s0, $t1 #add an extra 5 bytes for each line for valid bit and tag
+	sw $s0, actual_cache_size
 	move $t7, $s0
 	jal printInt #print size of cache with extra size for info
 	#dynamic allocation of cache
@@ -66,9 +87,11 @@ allocation:
 	move $a0, $s0 #where $s0 has number of bytes to allocate
 	syscall
 	move $s0, $v0 #$s0 is now the leading address of the cache
+	sw $s0, cache
 	
 	move $t8, $s5 #find necessary bits for number of sets
 	jal necessaryBits
+	sw $t8, set_index_size
 	move $s7, $t8
 	
 	move $t7, $t8
@@ -76,6 +99,7 @@ allocation:
 	
 	move $t8, $s1 #find necessary bits to specify offset
 	jal necessaryBits
+	sw $t8, offset_size
 	move $a3, $t8
 	
 	move $t7, $t8
@@ -84,6 +108,7 @@ allocation:
 	add $s6, $zero, 32 #calculate tag size
 	sub $s6, $s6, $s7
 	sub $s6, $s6, $a3 
+	sw $s6, tag_size
 	move $t7, $s6
 	jal printInt #print tag size
 	
