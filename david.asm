@@ -76,8 +76,9 @@ save_number_of_accesses:
 	sw $t1, access_queue_size
 	
 	#load the address of a dynamically allocated array with the appropriate size into access_queue
+	sll $t2, $t1, 2
 	li $v0, 9
-	move $a0, $t1
+	move $a0, $t2
 	syscall
 	sw $v0, access_queue
 	
@@ -229,16 +230,18 @@ allocation:
 	
 	#prepare to enter access_loop
 	
-	#move $t0, $zero
+	move $t0, $zero
 	lw $t1, access_queue_size
 	
-	li $v0, 1
-	move $a0, $t1
-	syscall
 
 access_loop:
-
-	subi $sp, $sp, 8
+	
+	#lw $t2, access_queue
+	#add $t2, $t2, $t0
+	#lw $a0, 0($t2)
+	#syscall
+	
+	addiu $sp, $sp, -8
 	sw $t0, ($sp)
 	sw $t1, 4($sp)
 	
@@ -246,8 +249,13 @@ access_loop:
 	
 	lw $t1, 4($sp)
 	lw $t0, ($sp)
-	addi $sp, $sp, 8
+	addiu $sp, $sp, 8
 	
+	#li $v0, 1
+	#move $a0, $t1
+	#syscall
+	
+	addi $t0, $t0, 1
 	blt $t0, $t1, access_loop
 	
 			
@@ -430,8 +438,9 @@ leftShiftDone:
 	jr $ra
 	
 get_one_line: #expects "index" value in t1
- 	sub $sp,$sp,4 # push ra
-	sw $ra,4($sp)
+
+	addiu $sp, $sp, -4
+	sw $ra, ($sp)
 	
 	add $t2, $zero, $zero	#reset
 	
@@ -483,8 +492,9 @@ get_one_line: #expects "index" value in t1
 	add $t5, $t5, $t4
 	sw $t2, ($t5)
 	
-	lw $ra,4($sp) # pop ra
-	add $sp,$sp,4
+	lw $ra, ($sp)
+	addiu $sp, $sp, 4
+
 	jr $ra
 	
 hexchar_to_int: #expect arg in $t3
