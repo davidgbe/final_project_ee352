@@ -287,35 +287,123 @@ end:
 	#end of program
 	li $v0, 10
 	syscall
-
-replaceLine: #expects memory address at $t7, set address $t8
 	
-findLRU: #expects set address $t8
-	
-	
-checkCache: #expects address at $t8. Returns set address in $t5, hit/miss in $t6, line address in $t7, and data $t8
-	move $s4, $ra
-	move $s0, $t8 #move the address
-	
-	jal findTagForAddress #compute tag
+findMemory: #expect address at $t8
+	addiu $sp, $sp, -8
+	sw $ra, ($sp)
+	sw $t8, 4($sp)
+	jal findTagForAddress #compute tag; store in $s1
 	move $s1, $t8
+	lw $ra, ($sp)
+	lw $t8, 4($sp)
+	addiu $sp, $sp, 8
 	
-	move $t8, $s0 #compute offset
-	jal findOffsetForAddress
+	addiu $sp, $sp, -8
+	sw $ra, ($sp)
+	sw $t8, 4($sp)
+	jal findOffsetForAddress #compute offset; store in $s2
 	move $s2, $t8
+	lw $ra, ($sp)
+	lw $t8, 4($sp)
+	addiu $sp, $sp, 8
 	
-	move $t8, $s0 #fetch matching set address
+	#calculate set address for memory address
+	addiu $sp, $sp, -8
+	sw $ra, ($sp)
+	sw $t8, 4($sp)
 	jal getSetAddress
-	move $t5, $t8
+	move $s3, $t8
+	lw $ra, ($sp)
+	lw $t8, 4($sp)
+	addiu $sp, $sp, 8
 	
+	addiu $sp, $sp, -8
+	sw $ra, ($sp)
+	sw $t8, 4($sp)
+	#check the cache
 	move $t6, $s2
 	move $t7, $s1
-	jal checkForMatchingTags
-
-	move $ra, $s4
+	move $t8, $s3
+	jal checkCache #Returns hit or miss in $t6, line address in $t7, data in $t8
+	move $t9, $t8
+	lw $ra, ($sp)
+	lw $t8, 4($sp)
+	addiu $sp, $sp, 8
+	beq $t6, $zero, cacheMiss
+	b cacheHit
+	
+cacheMiss:
+	addiu $sp, $sp, -8
+	sw $ra, ($sp)
+	sw $t8, 4($sp)
+	
+	move $t5, $s2
+	move $t6, $s1
+	move $t7, $8
+	move $t8, $s3
+	jal fetch
+	move $t9, $t8
+	
+	lw $ra, ($sp)
+	lw $t8, 4($sp)
+	addiu $sp, $sp, 8
+	j memoryFindEnd
+cacheHit:
+	#line address in $t7, data in $t9
+memoryFindEnd:
 	jr $ra
 	
-checkForMatchingTags: #expects offset in $t6, tag in $t7, address of set in $t8. Returns hit or miss in $t6, line address in $t7, data in $t8
+fetch: #expects offset at $t5, tag at $t6, memory address at $t7, set address $t8. Returns value at $t8
+	addiu $sp, $sp, -4
+	sw $ra, ($sp)
+	jal findLRU #Least Recently Used line now in $t8
+	sw $ra, ($sp)
+	addiu $sp, $sp, 4
+	lw $t2, line_size #fetch line size
+	addi $t3, $zero, 1 
+	sb $t3, ($t8) #put 1 into validity bit
+	sb $t3, 1($t8) #put 1 into number of uses of new line
+	sw $t6, 2($t8) #put tag into tag position for line
+	move $t0, $zero #incrementor 
+	addi $t1, $t8, 5 #first address of data within line
+	sub $t7, $t7, $t5 #first address of data within main memory
+replaceLoop:
+	lb $t4, ($t7) #fetch from from address in MM
+	sw $t4, ($t1) #write to cache
+	bne $t0, $t5, continueLoop 
+	move $t8, $t4 #if inc is equal to offset, save byte to be returned
+continueLoop:
+	addi $t7, $t7, 1
+	addi $t1, $t1, 1
+	addi $t0, $t0, 1
+	blt $t0, $t2, replaceLoop
+finishReplace:
+	jr $ra
+	
+	
+findLRU: #expects set address $t8, returns address of line to replace in $t8
+	move $t0, $zero
+	move $t1, $t8
+	lw $t2, lines_per_set
+	lw $t3, actual_line_size
+findLRULoop:
+	beq $t0, $t2, foundLRU
+	#check use bit
+	lb $t4, 1($t1)
+	bne $t0, $zero, compareUseBits
+	move $t5, $t4
+	move $t8, $t1
+compareUseBits:
+	bge $t5, $t4, increment
+	move $t5, $t4
+	move $t8, $t1
+increment:
+	addi $t0, $t0, 1
+	add $t1, $t1, $t3
+foundLRU:
+	jr $ra
+	
+checkCache: #expects offset in $t6, tag in $t7, address of set in $t8. Returns hit or miss in $t6, line address in $t7, data in $t8
 	add $t0, $zero, $zero
 	lw $t1, lines_per_set
 	lw $t2, actual_line_size
@@ -336,7 +424,7 @@ match:
 	lb $t5, 1($t3) #grab use bit, increment it, and store it
 	addi $t5, $t5, 1
 	sb $t5, 1($t3)
-	addi $t6, $t6, 6 #add 5 to offset to account for extra info
+	addi $t6, $t6, 5 #add 5 to offset to account for 6 byte offset for extra info
 	add $t8, $t3, $t6 #find byte of interest by offsetting current line by augmented offset
 	lb $t8, ($t8) #load byte of interest
 	addi $t6, $zero, 1 #indicate match was found
