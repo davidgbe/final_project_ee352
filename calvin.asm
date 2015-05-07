@@ -17,7 +17,8 @@
 	test_message: .asciiz "TEST: "
 	
 	#data
-	main_memory: .word 0 : 65536 #roughly 65KB of storage in main memory
+	main_memory: .byte 0 : 65536 #roughly 65KB of storage in main memory
+	main_memory_size: .word 65536
 	cache: .word 0
 	actual_cache_size: .word 0
 	virtual_cache_size: .word 0
@@ -228,24 +229,43 @@ allocation:
 	move $t7, $s6
 	jal printInt #print tag size
 	
-	#prepare to enter access_loop
 	
+	#get ready for populating main_memory
+	move $t0, $zero
+	lw $t1, main_memory_size
+	la $t2, main_memory
+	
+fill_main_memory_loop:
+	
+
+	add $t3, $t0, $t2	#address of next byte to store
+	
+	li $t4, 32		#value to store in MM
+	div $t0, $t4
+	mfhi $t4
+	
+	sb $t4, ($t3)
+	
+	addi $t0, $t0, 1
+	blt $t0, $t1, fill_main_memory_loop
+	
+	
+	#prepare to enter access_loop
 	move $t0, $zero
 	lw $t1, access_queue_size
-	
 
 access_loop:
 	
-	lw $t2, access_queue
-	sll $t3, $t0, 2
-	add $t2, $t2, $t3
-	li $v0, 1
-	lw $a0, 0($t2)
-	syscall
+	#lw $t2, access_queue
+	#sll $t3, $t0, 2
+	#add $t2, $t2, $t3
+	#li $v0, 1
+	#lw $a0, 0($t2)
+	#syscall
 	
-	li $v0, 4
-	la $a0, newline
-	syscall
+	#li $v0, 4
+	#la $a0, newline
+	#syscall
 	
 	addiu $sp, $sp, -8
 	sw $t0, 0($sp)
