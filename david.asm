@@ -72,7 +72,14 @@ save_number_of_accesses:
 	div $t0, $t1
 	mflo $t1
 	addi $t1, $t1, 1
+
 	sw $t1, access_queue_size
+	
+	#load the address of a dynamically allocated array with the appropriate size into access_queue
+	li $v0, 9
+	move $a0, $t1
+	syscall
+	sw $v0, access_queue
 	
 	li $v0, 4
 	la $a0, number_of_accesses_message
@@ -96,6 +103,7 @@ loop_through_lines:
 	
 # Close File
 close_file:
+
 	li	$v0, 16		# Close File Syscall
 	move	$a0, $s6	# Load File Descriptor
 	syscall
@@ -170,6 +178,7 @@ improper_cache_size:
 	j end
 	
 allocation:	
+
 	addi $t1, $zero, 5
 	mult $t1, $s4 #find amount of extra info to be added for valid bit and tag
 	mflo $t1
@@ -218,6 +227,31 @@ allocation:
 	syscall
 	move $t7, $s6
 	jal printInt #print tag size
+	
+	#prepare to enter access_loop
+	
+	#move $t0, $zero
+	lw $t1, access_queue_size
+	
+	li $v0, 1
+	move $a0, $t1
+	syscall
+
+access_loop:
+
+	subi $sp, $sp, 8
+	sw $t0, ($sp)
+	sw $t1, 4($sp)
+	
+	jal checkCache
+	
+	lw $t1, 4($sp)
+	lw $t0, ($sp)
+	addi $sp, $sp, 8
+	
+	blt $t0, $t1, access_loop
+	
+			
 	
 end:
 	#end of program
@@ -433,21 +467,15 @@ get_one_line: #expects "index" value in t1
 	
 	addi $t1, $t1, 1
 	
-#	li $v0, 1
-#	move $a0, $t2
-#	syscall
-#	
-#	li $v0, 4
-#	la $a0, newline
-#	syscall
-	
 	#store converted address in proper location
 	lw $t4, trace_file_line_length($zero)
 	div $t1, $t4
 	mflo $t4
 	sll $t4, $t4, 2
 	
-	sw $t2, access_queue($t4)
+	lw $t5, access_queue
+	add $t5, $t5, $t4
+	sw $t2, ($t5)
 	
 	lw $ra,4($sp) # pop ra
 	add $sp,$sp,4
