@@ -107,7 +107,7 @@ begin_collection:
 	move $s1, $a0
 	sw $s1, line_size
 	
-	addi $t0, $s1, 5
+	addi $t0, $s1, 6 #add 6 for actual line size
 	sw $t0, actual_line_size
 	
 	la $t7, ask_for_lines_per_set
@@ -122,7 +122,7 @@ begin_collection:
 	#move $t7, $s3
 	#jal printInt #print set size
 	
-	addi $t0, $s1, 5
+	addi $t0, $s1, 6
 	mult $s2, $t0
 	mflo $t0
 	sw $t0, actual_set_size
@@ -170,10 +170,10 @@ improper_cache_size:
 	j end
 	
 allocation:	
-	addi $t1, $zero, 5
+	addi $t1, $zero, 6
 	mult $t1, $s4 #find amount of extra info to be added for valid bit and tag
 	mflo $t1
-	add $s0, $s0, $t1 #add an extra 5 bytes for each line for valid bit and tag
+	add $s0, $s0, $t1 #add an extra 6 bytes for each line for valid bit and tag
 	sw $s0, actual_cache_size
 	
 	#move $t7, $s0
@@ -223,10 +223,13 @@ end:
 	#end of program
 	li $v0, 10
 	syscall
+
+replaceLine: #expects memory address at $t7, set address $t8
+	
+findLRU: #expects set address $t8
 	
 	
-	
-checkCache: #expects address at $t8. Returns hit/miss in $t6, line address in $t7, and data $t8
+checkCache: #expects address at $t8. Returns set address in $t5, hit/miss in $t6, line address in $t7, and data $t8
 	move $s4, $ra
 	move $s0, $t8 #move the address
 	
@@ -239,6 +242,7 @@ checkCache: #expects address at $t8. Returns hit/miss in $t6, line address in $t
 	
 	move $t8, $s0 #fetch matching set address
 	jal getSetAddress
+	move $t5, $t8
 	
 	move $t6, $s2
 	move $t7, $s1
@@ -258,14 +262,17 @@ matchingTagLoop:
 	beq $t4, 1, checkTag #if valid byte indicates validity, jump to check the tag
 	j incr
 checkTag: 
-	lw $t5, 1($t3) #load tag
+	lw $t5, 2($t3) #load tag
 	beq $t5, $t7, match #if desired tag and current tag match, there is a match
 incr:
 	addi $t0, $t0, 1
 	add $t3, $t3, $t2
 	j matchingTagLoop
 match: 
-	addi $t6, $t6, 5 #add 5 to offset to account for extra info
+	lb $t5, 1($t3) #grab use bit, increment it, and store it
+	addi $t5, $t5, 1
+	sb $t5, 1($t3)
+	addi $t6, $t6, 6 #add 5 to offset to account for extra info
 	add $t8, $t3, $t6 #find byte of interest by offsetting current line by augmented offset
 	lb $t8, ($t8) #load byte of interest
 	addi $t6, $zero, 1 #indicate match was found
