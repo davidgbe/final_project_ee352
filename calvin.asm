@@ -17,7 +17,8 @@
 	test_message: .asciiz "TEST: "
 	
 	#data
-	main_memory: .word 0 : 65536 #roughly 65KB of storage in main memory
+	main_memory: .byte 0 : 65536 #roughly 65KB of storage in main memory
+	main_memory_size: .word 65536
 	cache: .word 0
 	actual_cache_size: .word 0
 	virtual_cache_size: .word 0
@@ -228,34 +229,56 @@ allocation:
 	move $t7, $s6
 	jal printInt #print tag size
 	
-	#prepare to enter access_loop
 	
+	#get ready for populating main_memory
+	move $t0, $zero
+	lw $t1, main_memory_size
+	la $t2, main_memory
+	
+fill_main_memory_loop:
+	
+
+	add $t3, $t0, $t2	#address of next byte to store
+	
+	li $t4, 32		#value to store in MM
+	div $t0, $t4
+	mfhi $t4
+	
+	sb $t4, ($t3)
+	
+	addi $t0, $t0, 1
+	blt $t0, $t1, fill_main_memory_loop
+	
+	
+	#prepare to enter access_loop
 	move $t0, $zero
 	lw $t1, access_queue_size
-	
 
 access_loop:
 	
 	#lw $t2, access_queue
-	#add $t2, $t2, $t0
+	#sll $t3, $t0, 2
+	#add $t2, $t2, $t3
+	#li $v0, 1
 	#lw $a0, 0($t2)
 	#syscall
 	
+	#li $v0, 4
+	#la $a0, newline
+	#syscall
+	
 	addiu $sp, $sp, -8
-	sw $t0, ($sp)
+	sw $t0, 0($sp)
 	sw $t1, 4($sp)
 	
 	jal checkCache
 	
 	lw $t1, 4($sp)
-	lw $t0, ($sp)
+	lw $t0, 0($sp)
 	addiu $sp, $sp, 8
 	
-	#li $v0, 1
-	#move $a0, $t1
-	#syscall
-	
 	addi $t0, $t0, 1
+	
 	blt $t0, $t1, access_loop
 	
 			
@@ -364,9 +387,11 @@ findTagForAddress: #expects memory arg in $t8, returns tag in $t8
 	lw $t8, offset_size
 	lw $t9, set_index_size
 	add $t8, $t8, $t9
+	addiu $sp, $sp, -4
 	sw $ra, ($sp)
 	jal rightShift
 	lw $ra, ($sp)
+	addiu $sp, $sp, 4
 	move $t8, $t7
 	jr $ra
 	
@@ -374,9 +399,11 @@ findOffsetForAddress: #expects memory arg in $t8, returns set in $t8
 	move $t1, $t8
 	lw $t8, offset_size
 	addi $t7, $zero, 1
+	addiu $sp, $sp, -4
 	sw $ra, ($sp)
 	jal leftShift
 	lw $ra, ($sp)
+	addiu $sp, $sp, 4
 	div $t1, $t7
 	mfhi $t8
 	jr $ra
@@ -439,7 +466,7 @@ leftShiftDone:
 	
 get_one_line: #expects "index" value in t1
 
-	addiu $sp, $sp, -4
+	addi $sp, $sp, -4
 	sw $ra, ($sp)
 	
 	add $t2, $zero, $zero	#reset
@@ -493,7 +520,7 @@ get_one_line: #expects "index" value in t1
 	sw $t2, ($t5)
 	
 	lw $ra, ($sp)
-	addiu $sp, $sp, 4
+	addi $sp, $sp, 4
 
 	jr $ra
 	
