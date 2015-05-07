@@ -11,6 +11,9 @@
 	size_of_tag_text: .asciiz "Size of tag: " 
 	bits_needed_offset_text: .asciiz "Bits needed for offset: "
 	bits_needed_sets_text: .asciiz "Bits needed for sets: "
+	cash_miss_message: .asciiz "Cash miss!\n"
+	cash_hit_message: .asciiz "Cash hit!\n"
+
 	
 	#helpful for printing
 	newline: .asciiz "\n"
@@ -34,6 +37,7 @@
 	tag_size: .word 0
 	access_queue: .word 0
 	access_queue_size: .word 200
+	address: .word 0
 	
 	#input data
 	buffer: .space 1400
@@ -253,25 +257,24 @@ fill_main_memory_loop:
 	#prepare to enter access_loop
 	move $t0, $zero
 	lw $t1, access_queue_size
+	#li $t1, 1
 
 access_loop:
 	
-	#lw $t2, access_queue
-	#sll $t3, $t0, 2
-	#add $t2, $t2, $t3
-	#li $v0, 1
-	#lw $a0, 0($t2)
-	#syscall
-	
-	#li $v0, 4
-	#la $a0, newline
-	#syscall
+	lw $t2, access_queue
+	sll $t3, $t0, 2
+	add $t2, $t2, $t3
 	
 	addiu $sp, $sp, -8
 	sw $t0, 0($sp)
 	sw $t1, 4($sp)
 	
-	jal checkCache
+	la $t4, main_memory
+	lw $t2, 0($t2)
+	add $t2, $t2, $t4
+	move $t8, $t2
+	
+	jal findMemory
 	
 	lw $t1, 4($sp)
 	lw $t0, 0($sp)
@@ -281,14 +284,13 @@ access_loop:
 	
 	blt $t0, $t1, access_loop
 	
-			
-	
 end:
 	#end of program
 	li $v0, 10
 	syscall
 	
 findMemory: #expect address at $t8
+	move $s0, $t8
 	addiu $sp, $sp, -8
 	sw $ra, ($sp)
 	sw $t8, 4($sp)
@@ -333,13 +335,18 @@ findMemory: #expect address at $t8
 	b cacheHit
 	
 cacheMiss:
+
+	li $v0, 4
+	la $a0, cash_miss_message
+	syscall
+
 	addiu $sp, $sp, -8
 	sw $ra, ($sp)
 	sw $t8, 4($sp)
 	
 	move $t5, $s2
 	move $t6, $s1
-	move $t7, $8
+	move $t7, $t8
 	move $t8, $s3
 	jal fetch
 	move $t9, $t8
@@ -349,6 +356,9 @@ cacheMiss:
 	addiu $sp, $sp, 8
 	j memoryFindEnd
 cacheHit:
+	li $v0, 4
+	la $a0, cash_hit_message
+	syscall
 	#line address in $t7, data in $t9
 memoryFindEnd:
 	jr $ra
@@ -357,19 +367,38 @@ fetch: #expects offset at $t5, tag at $t6, memory address at $t7, set address $t
 	addiu $sp, $sp, -4
 	sw $ra, ($sp)
 	jal findLRU #Least Recently Used line now in $t8
-	sw $ra, ($sp)
+	lw $ra, ($sp)
 	addiu $sp, $sp, 4
 	lw $t2, line_size #fetch line size
 	addi $t3, $zero, 1 
 	sb $t3, ($t8) #put 1 into validity bit
 	sb $t3, 1($t8) #put 1 into number of uses of new line
-	sw $t6, 2($t8) #put tag into tag position for line
+	
+	sw $t6, address
+	move $t9, $zero
+copyLoop:
+	la $t6, address
+	add $t6, $t6, $t9
+	lb $t6, ($t6)
+	add $k0, $t8, $t9
+	sb $t6, 2($k0)
+	addi $t9, $t9, 1
+	blt $t9, 4, copyLoop
+	
+	la $t6, address
+	addi $t6, $t6, 4
+	lb $t6, ($t6)
+	sb $t6, 2($t8)
+	
+	#sw $t6, 2($t8) #put tag into tag position for line
+	
+	
 	move $t0, $zero #incrementor 
 	addi $t1, $t8, 5 #first address of data within line
 	sub $t7, $t7, $t5 #first address of data within main memory
 replaceLoop:
 	lb $t4, ($t7) #fetch from from address in MM
-	sw $t4, ($t1) #write to cache
+	sb $t4, ($t1) #write to cache
 	bne $t0, $t5, continueLoop 
 	move $t8, $t4 #if inc is equal to offset, save byte to be returned
 continueLoop:
@@ -394,12 +423,13 @@ findLRULoop:
 	move $t5, $t4
 	move $t8, $t1
 compareUseBits:
-	bge $t5, $t4, increment
+	blt $t5, $t4, increment
 	move $t5, $t4
 	move $t8, $t1
 increment:
 	addi $t0, $t0, 1
 	add $t1, $t1, $t3
+	b findLRULoop
 foundLRU:
 	jr $ra
 	
@@ -415,6 +445,18 @@ matchingTagLoop:
 	j incr
 checkTag: 
 	lw $t5, 2($t3) #load tag
+	li $v0, 1
+	move $a0, $t5
+	syscall
+	li $v0, 4
+	la $a0, newline
+	syscall
+	li $v0, 1
+	move $a0, $t7
+	syscall
+	li $v0, 4
+	la $a0, newline
+	syscall
 	beq $t5, $t7, match #if desired tag and current tag match, there is a match
 incr:
 	addi $t0, $t0, 1
