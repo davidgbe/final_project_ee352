@@ -178,12 +178,7 @@ improper_cache_size:
 	j end
 	
 allocation:	
-<<<<<<< HEAD
 	addi $t1, $zero, 6
-=======
-
-	addi $t1, $zero, 5
->>>>>>> 6208be03161f9723ac46d00006adaebed5427ad0
 	mult $t1, $s4 #find amount of extra info to be added for valid bit and tag
 	mflo $t1
 	add $s0, $s0, $t1 #add an extra 6 bytes for each line for valid bit and tag
