@@ -24,6 +24,7 @@
 	access_queue: .word 0
 	access_queue_size: .word 200
 	
+	test: .word 536870909
 	
 .text
 
@@ -112,13 +113,54 @@ allocation:
 	move $t7, $s6
 	jal printInt #print tag size
 	
+	lw $s0, test
+	move $t8, $s0
+	jal findSetIndexForAddress
+	move $t7, $t8
+	jal printInt
+	
 end:
 	#end of program
 	li $v0, 10
 	syscall
 	
-findSetForAddress: 
+findSetIndexForAddress: #expects memory arg in $t8, returns set in $t8
+	move $t7, $t8
+	lw $t8, offset_size
+	sw $ra, ($sp)
+	jal rightShift
+	lw $ra, ($sp)
+	lw $t8, set_index_size
+	move $t1, $t7
+	addi $t7, $zero, 1
+	sw $ra, ($sp)
+	jal leftShift
+	lw $ra, ($sp)
+	div $t1, $t7
+	mfhi $t8
+	jr $ra
 	
+findTagForAddress: #expects memory arg in $t8, returns set in $t8
+	move $t7, $t8
+	lw $t8, offset_size
+	lw $t9, set_index_size
+	add $t8, $t8, $t9
+	sw $ra, ($sp)
+	jal rightShift
+	lw $ra, ($sp)
+	move $t8, $t7
+	jr $ra
+	
+findOffsetForAddress: #expects memory arg in $t8, returns set in $t8
+	move $t1, $t8
+	lw $t8, offset_size
+	addi $t7, $zero, 1
+	sw $ra, ($sp)
+	jal leftShift
+	lw $ra, ($sp)
+	div $t1, $t7
+	mfhi $t8
+	jr $ra
 
 collectInput: #expects arg in $t7
 	li $v0, 4
@@ -144,7 +186,7 @@ printInt: #expects arg in $t7
 	syscall
 	jr $ra
 
-necessaryBits: #excepts arg to be in $t8, returns in $t8
+necessaryBits: #expects arg to be in $t8, returns in $t8
 	add $t9, $zero, 1
 	add $t6, $zero, 0
 loop:
@@ -156,4 +198,22 @@ return:
 	move $t8, $t6
 	jr $ra
 	
-	
+rightShift: #expects arg <toShift> in $t7, and arg <timeToShift> in $t8
+	add $t0, $zero, $zero
+rightShiftLoop:
+	beq $t0, $t8, rightShiftDone
+	srl $t7, $t7, 1
+	addi $t0, $t0, 1
+	j rightShiftLoop
+rightShiftDone:
+	jr $ra
+
+leftShift: #expects arg <toShift> in $t7, and arg <timesToShift> in $t8
+	add $t0, $zero, $zero
+leftShiftLoop:
+	beq $t0, $t8, leftShiftDone
+	sll $t7, $t7, 1
+	addi $t0, $t0, 1
+	j leftShiftLoop
+leftShiftDone:
+	jr $ra
