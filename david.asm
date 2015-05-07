@@ -129,9 +129,10 @@ allocation:
 	lw $s0, test #print calculate set address
 	move $t8, $s0
 	jal checkCache
+	move $t0, $t7
 	move $t7, $t6
 	jal printInt
-	move $t7, $t7
+	move $t7, $t0
 	jal printInt
 	move $t7, $t8
 	jal printInt
@@ -169,7 +170,7 @@ checkForMatchingTags: #expects offset in $t6, tag in $t7, address of set in $t8.
 	add $t0, $zero, $zero
 	lw $t1, lines_per_set
 	lw $t2, actual_line_size
-	move $t3, $t8 #$t3 is line pointer
+	move $t3, $t8
 matchingTagLoop:
 	beq $t0, $t1, noMatch #if we exceed line number per set, there is no match
 	lb $t4, ($t3) #load valid byte
