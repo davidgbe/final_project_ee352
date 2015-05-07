@@ -13,6 +13,7 @@
 	bits_needed_sets_text: .asciiz "Bits needed for sets: "
 	cash_miss_message: .asciiz "Cash miss!\n"
 	cash_hit_message: .asciiz "Cash hit!\n"
+	set_address_message: .asciiz "Set Address: "
 
 	
 	#helpful for printing
@@ -380,21 +381,14 @@ copyLoop:
 	la $t6, address
 	add $t6, $t6, $t9
 	lb $t6, ($t6)
+
 	add $k0, $t8, $t9
 	sb $t6, 2($k0)
 	addi $t9, $t9, 1
 	blt $t9, 4, copyLoop
 	
-	la $t6, address
-	addi $t6, $t6, 4
-	lb $t6, ($t6)
-	sb $t6, 2($t8)
-	
-	#sw $t6, 2($t8) #put tag into tag position for line
-	
-	
 	move $t0, $zero #incrementor 
-	addi $t1, $t8, 5 #first address of data within line
+	addi $t1, $t8, 6 #first address of data within line
 	sub $t7, $t7, $t5 #first address of data within main memory
 replaceLoop:
 	lb $t4, ($t7) #fetch from from address in MM
@@ -434,6 +428,16 @@ foundLRU:
 	jr $ra
 	
 checkCache: #expects offset in $t6, tag in $t7, address of set in $t8. Returns hit or miss in $t6, line address in $t7, data in $t8
+	li $v0, 4
+	la $a0, set_address_message
+	syscall
+	li $v0, 1
+	move $a0, $t8
+	syscall
+	li $v0, 4
+	la $a0, newline
+	syscall
+	
 	add $t0, $zero, $zero
 	lw $t1, lines_per_set
 	lw $t2, actual_line_size
@@ -442,22 +446,37 @@ matchingTagLoop:
 	beq $t0, $t1, noMatch #if we exceed line number per set, there is no match
 	lb $t4, ($t3) #load valid byte
 	beq $t4, 1, checkTag #if valid byte indicates validity, jump to check the tag
-	j incr
+	b incr
 checkTag: 
-	lw $t5, 2($t3) #load tag
-	li $v0, 1
-	move $a0, $t5
-	syscall
-	li $v0, 4
-	la $a0, newline
-	syscall
+	
 	li $v0, 1
 	move $a0, $t7
 	syscall
 	li $v0, 4
 	la $a0, newline
 	syscall
-	beq $t5, $t7, match #if desired tag and current tag match, there is a match
+	
+	sw $t7, address
+	la $t7, address
+	
+	lb $t5, 2($t3) #load tag
+	lb $s7, ($t7)
+	bne $t5, $s7, noMatch
+	
+	lb $t5, 3($t3) #load tag
+	lb $s7, 1($t7)
+	bne $t5, $s7, noMatch
+	
+	lb $t5, 4($t3) #load tag
+	lb $s7, 2($t7)
+	bne $t5, $s7, noMatch
+	
+	lb $t5, 5($t3) #load tag
+	lb $s7, 3($t7)
+	bne $t5, $s7, noMatch
+
+
+	b match #if desired tag and current tag match, there is a match
 incr:
 	addi $t0, $t0, 1
 	add $t3, $t3, $t2
@@ -466,7 +485,7 @@ match:
 	lb $t5, 1($t3) #grab use bit, increment it, and store it
 	addi $t5, $t5, 1
 	sb $t5, 1($t3)
-	addi $t6, $t6, 5 #add 5 to offset to account for 6 byte offset for extra info
+	addi $t6, $t6, 6 #add 6 to offset to account for 6 byte offset for extra info
 	add $t8, $t3, $t6 #find byte of interest by offsetting current line by augmented offset
 	lb $t8, ($t8) #load byte of interest
 	addi $t6, $zero, 1 #indicate match was found
