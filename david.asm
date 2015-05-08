@@ -48,6 +48,17 @@
 	
 	test: .word 536870397
 	
+	
+	total_clock_cycles: .word 0
+	num_hits: .word 0
+	num_misses: .word 0
+	cycles_per_hit: .word 264
+	cycles_per_miss: .word 431
+	
+	hit_rate_text: 		.asciiz "HIT RATE: "
+	total_cycles_test:	.asciiz  "TOTAL # CYCLES: "
+	average_cycles_test:	.asciiz  "AVERAGE # CYCLES/ACCESS : "
+	
 .text
 
 main:
@@ -258,7 +269,6 @@ fill_main_memory_loop:
 	#prepare to enter access_loop
 	move $t0, $zero
 	lw $t1, access_queue_size
-	#li $t1, 1
 
 access_loop:
 	
@@ -284,6 +294,80 @@ access_loop:
 	addi $t0, $t0, 1
 	
 	blt $t0, $t1, access_loop
+	
+print_stats:
+	lw $t0, num_hits
+	lw $t1, num_misses
+	lw $t2, access_queue_size
+	lw $t3, cycles_per_hit
+	lw $t4, cycles_per_miss
+	
+	#convert to floating point for divison
+	mtc1 $t0, $f1
+	cvt.s.w $f1, $f1
+	
+	mtc1 $t2, $f2
+	cvt.s.w $f2, $f2
+	
+	#$f0 = HIT-RATE
+	div.s $f0, $f1, $f2
+	##
+
+	mult $t0, $t3 #$t6 = hits*cycles_per_hit
+	mflo $t6
+	
+	mult $t1, $t4 #$t7 = misses*cycles_per_miss
+	mflo $t7
+	
+	#$t6 = TOTAL-NUMBER-CYCLES
+	add $t6, $t6, $t7
+	##
+	
+	mtc1 $t2, $f2
+	cvt.s.w $f2, $f2
+	
+	mtc1 $t6, $f3
+	cvt.s.w $f3, $f3
+	
+	#$f1 = AVG CYCLE/ACCESS
+	div.s $f1, $f3, $f2
+	##
+		
+	li $v0, 4
+	la $a0, hit_rate_text
+	syscall
+	
+	li $v0, 2
+	mov.s $f12, $f0
+	syscall
+	
+	li $v0, 4
+	la $a0, newline
+	syscall
+	
+	li $v0, 4
+	la $a0, total_cycles_test
+	syscall
+	
+	li $v0, 1
+	move $a0, $t6
+	syscall
+	
+	li $v0, 4
+	la $a0, newline
+	syscall
+	
+	li $v0, 4
+	la $a0, average_cycles_test
+	syscall
+	
+	li $v0, 2
+	mov.s $f12, $f1
+	syscall
+	
+	li $v0, 4
+	la $a0, newline
+	syscall
 	
 end:
 	#end of program
@@ -337,6 +421,10 @@ findMemory: #expect address at $t8
 	
 cacheMiss:
 
+	lw $t1, num_misses
+	addi $t1, $t1, 1
+	sw $t1, num_misses
+
 	li $v0, 4
 	la $a0, cash_miss_message
 	syscall
@@ -357,6 +445,9 @@ cacheMiss:
 	addiu $sp, $sp, 8
 	j memoryFindEnd
 cacheHit:
+	lw $t1, num_hits
+	addi $t1, $t1, 1
+	sw $t1, num_hits
 	li $v0, 4
 	la $a0, cash_hit_message
 	syscall
