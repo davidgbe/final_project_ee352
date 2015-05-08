@@ -14,6 +14,7 @@
 	cash_miss_message: .asciiz "Cash miss!\n"
 	cash_hit_message: .asciiz "Cash hit!\n"
 	set_address_message: .asciiz "Set Address: "
+	line_address_message: .asciiz "Line Address: "
 
 	
 	#helpful for printing
@@ -538,15 +539,7 @@ matchingTagLoop:
 	lb $t4, ($t3) #load valid byte
 	beq $t4, 1, checkTag #if valid byte indicates validity, jump to check the tag
 	b incr
-checkTag: 
-	
-	li $v0, 1
-	move $a0, $t7
-	syscall
-	li $v0, 4
-	la $a0, newline
-	syscall
-	
+checkTag: 	
 	sw $t7, address
 	la $t7, address
 	
@@ -580,7 +573,16 @@ match:
 	add $t8, $t3, $t6 #find byte of interest by offsetting current line by augmented offset
 	lb $t8, ($t8) #load byte of interest
 	addi $t6, $zero, 1 #indicate match was found
-	move $t7, $t4 #return line address
+	move $t7, $t3 #return line address
+	li $v0, 4
+	la $a0, line_address_message
+	syscall
+	li $v0, 1
+	move $a0, $t7
+	syscall
+	li $v0, 4
+	la $a0, newline
+	syscall
 	j matchReturn
 noMatch:
 	move $t7, $t3
